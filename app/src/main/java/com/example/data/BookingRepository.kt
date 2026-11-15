@@ -1,4 +1,4 @@
-@file:OptIn(io.github.jan.supabase.annotiations.SupabaseExperimental::class)
+@file:OptIn(io.github.jan.supabase.annotations.SupabaseExperimental::class)
 
 package com.example.data
 
