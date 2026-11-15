@@ -6,7 +6,7 @@ on:
       - unified-supabase-booking-admin
   pull_request:
     branches:
-      - main
+      - email-password-admin
 
 permissions:
   contents: read
