@@ -60,7 +60,10 @@ class BookingRepository(
     dateKey: String, status: BookingStatus, clientName: String,
     clientPhone: String, eventType: String, notes: String,
   ) {
-    require(status != BookingStatus.AVAILABLE)
+    if (status == BookingStatus.AVAILABLE) {
+      clearBooking(dateKey)
+      return
+    }
     client.postgrest.rpc("save_shree_booking", SaveBookingParams(
       bookingDate = dateKey, status = status.value,
       clientName = clientName.trim().take(100), clientPhone = clientPhone.trim().take(30),
