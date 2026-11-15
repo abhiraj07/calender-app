@@ -9,7 +9,6 @@ import com.example.data.BookingStatus
 import com.example.data.CalendarDateEntry
 import com.example.data.HallDate
 import com.example.data.HallYearMonth
-import com.google.firebase.firestore.FirebaseFirestoreException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -71,14 +70,9 @@ class BookingCalendarViewModel(
         UiState.Success(it)
       }
       .catch { error ->
-        val firestoreError =
-          generateSequence(error) { it.cause }
-            .filterIsInstance<FirebaseFirestoreException>()
-            .firstOrNull()
-        if (firestoreError == null && error is CancellationException) throw error
-        val rootError = firestoreError ?: error
-        Log.w(TAG, "Error observing calendar dates", rootError)
-        emit(UiState.Error(rootError.message ?: "Failed to load booking calendar"))
+        if (error is CancellationException) throw error
+        Log.w(TAG, "Error observing calendar dates", error)
+        emit(UiState.Error(error.message ?: "Failed to load booking calendar"))
       }
       .stateIn(
         scope = viewModelScope,
@@ -91,12 +85,8 @@ class BookingCalendarViewModel(
       .flatMapLatest { unlocked ->
         if (unlocked) {
           repository.observeAdminBookings().catch { error ->
-            val firestoreError =
-              generateSequence(error) { it.cause }
-                .filterIsInstance<FirebaseFirestoreException>()
-                .firstOrNull()
-            if (firestoreError == null && error is CancellationException) throw error
-            Log.w(TAG, "Error observing admin bookings", firestoreError ?: error)
+            if (error is CancellationException) throw error
+            Log.w(TAG, "Error observing admin bookings", error)
             emit(emptyMap())
           }
         } else {
@@ -179,6 +169,14 @@ class BookingCalendarViewModel(
   fun lockAdminMode() {
     _isAdminModeUnlocked.value = false
     _adminLoginFeedback.value = AdminLoginFeedback.Idle
+    viewModelScope.launch {
+      try {
+        repository.signOutAdmin()
+        _isAuthorizedAdmin.value = false
+      } catch (error: Exception) {
+        Log.w(TAG, "Unable to clear the Supabase admin session", error)
+      }
+    }
   }
 
   fun saveBooking(
