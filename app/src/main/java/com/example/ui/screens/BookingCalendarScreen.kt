@@ -28,6 +28,7 @@ import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.AdminPanelSettings
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -80,6 +81,7 @@ import com.example.ui.theme.PlayfairDisplayFontFamily
 import com.example.ui.theme.PureWarmWhite
 import com.example.ui.theme.SoftGoldTint
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BookingCalendarScreen(
   viewModel: BookingCalendarViewModel,
