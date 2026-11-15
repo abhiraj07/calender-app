@@ -33,7 +33,8 @@ class BookingRepository(
       } }
 
   suspend fun signInAdmin(usernameOrEmail: String, password: String): Boolean {
-    if (usernameOrEmail.trim().lowercase() != ADMIN_USERNAME || password.isBlank()) return false
+    val identifier = usernameOrEmail.trim().lowercase()
+    if ((identifier != ADMIN_USERNAME && identifier != ADMIN_AUTH_EMAIL) || password.isBlank()) return false
     return try {
       client.auth.signInWith(Email) {
         email = ADMIN_AUTH_EMAIL
