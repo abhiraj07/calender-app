@@ -5,6 +5,7 @@ import com.example.R
 import com.google.firebase.Firebase
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.auth
+import com.google.firebase.auth.signInWithEmailAndPassword
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
@@ -30,7 +31,7 @@ class BookingRepository(
 
   private fun requireUserId(): String =
     auth.currentUser?.uid
-      ?: throw IllegalStateException("User must be signed in with Google before accessing Firestore.")
+      ?: throw IllegalStateException("User must be signed in before accessing Firestore.")
 
   fun observePublicCalendarDates(): Flow<Map<String, CalendarDateEntry>> {
     val path = CALENDAR_DATES_COLLECTION
@@ -85,6 +86,28 @@ class BookingRepository(
         }
         throw error
       }
+  }
+
+  suspend fun signInAdmin(usernameOrEmail: String, password: String): Boolean {
+    val identifier = usernameOrEmail.trim().lowercase()
+    val email = when (identifier) {
+      ADMIN_USERNAME -> BOOTSTRAPPED_ADMIN_HALL
+      BOOTSTRAPPED_ADMIN_HALL -> BOOTSTRAPPED_ADMIN_HALL
+      else -> return false
+    }
+    return try {
+      auth.signInWithEmailAndPassword(email, password).await()
+      val user = auth.currentUser ?: return false
+      if (!user.isEmailVerified) {
+        auth.signOut()
+        return false
+      }
+      checkIsAdminAccount()
+    } catch (e: CancellationException) {
+      throw e
+    } catch (_: Exception) {
+      false
+    }
   }
 
   suspend fun checkIsAdminAccount(): Boolean {
@@ -205,6 +228,7 @@ class BookingRepository(
     const val CALENDAR_DATES_COLLECTION = "calendar_dates"
     const val ADMIN_BOOKINGS_COLLECTION = "admin_bookings"
     const val ADMINS_COLLECTION = "admins"
+    const val ADMIN_USERNAME = "admin980123"
     const val BOOTSTRAPPED_ADMIN_PRIMARY = "abhiraj2482@gmail.com"
     const val BOOTSTRAPPED_ADMIN_HALL = "krshreebanquethall@gmail.com"
   }
