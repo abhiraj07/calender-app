@@ -1,5 +1,6 @@
 package com.example.data
 
+import io.github.jan.supabase.ExperimentalSupabaseApi
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.providers.builtin.Email
 import io.github.jan.supabase.postgrest.from
@@ -8,7 +9,10 @@ import io.github.jan.supabase.realtime.selectAsFlow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.first
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
+@OptIn(ExperimentalSupabaseApi::class)
 class BookingRepository(
   private val client: io.github.jan.supabase.SupabaseClient = SupabaseClientProvider.client,
 ) {
@@ -47,7 +51,7 @@ class BookingRepository(
 
   suspend fun checkIsAdminAccount(): Boolean = try {
     client.auth.awaitInitialization()
-    client.from(ADMIN_USERS_TABLE).selectAsFlow(AdminUserRow::id).first().isNotEmpty()
+    client.from(ADMIN_USERS_TABLE).selectAsFlow(AdminUserRow::userId).first().isNotEmpty()
   } catch (error: kotlinx.coroutines.CancellationException) {
     throw error
   } catch (_: Exception) {
@@ -66,15 +70,20 @@ class BookingRepository(
       clearBooking(dateKey)
       return
     }
-    client.postgrest.rpc("save_shree_booking", SaveBookingParams(
-      bookingDate = dateKey, status = status.value,
-      clientName = clientName.trim().take(100), clientPhone = clientPhone.trim().take(30),
-      eventType = eventType.trim().take(60), notes = notes.trim().take(500)
-    ))
+    client.postgrest.rpc("save_shree_booking", buildJsonObject {
+      put("p_booking_date", dateKey)
+      put("p_status", status.value)
+      put("p_client_name", clientName.trim().take(100))
+      put("p_client_phone", clientPhone.trim().take(30))
+      put("p_event_type", eventType.trim().take(60))
+      put("p_notes", notes.trim().take(500))
+    })
   }
 
   suspend fun clearBooking(dateKey: String) {
-    client.postgrest.rpc("clear_shree_booking", ClearBookingParams(bookingDate = dateKey))
+    client.postgrest.rpc("clear_shree_booking", buildJsonObject {
+      put("p_booking_date", dateKey)
+    })
   }
 
   companion object {
