@@ -235,7 +235,9 @@ fun BookingCalendarScreen(
             if (isAdminUnlocked && adminBookings.isNotEmpty()) {
               Spacer(modifier = Modifier.height(20.dp))
               AdminUpcomingBookingsSection(
-                bookings = adminBookings.values.sortedBy { it.dateKey },
+                bookings = adminBookings.values
+                  .filter { it.dateKey.startsWith("%04d-%02d".format(displayedMonth.year, displayedMonth.month)) }
+                  .sortedBy { it.dateKey },
                 onBookingClick = { dateKey ->
                   HallDate.fromKey(dateKey)?.let { viewModel.selectDate(it) }
                 },
