@@ -1,14 +1,29 @@
 package com.example
 
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.credentials.CredentialManager
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
@@ -19,11 +34,11 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.example.auth.onGoogleSignInClicked
 import com.example.auth.signOut
 import com.example.data.BookingRepository
 import com.example.ui.BookingCalendarViewModel
 import com.example.ui.screens.AdminLoginScreen
-import com.example.ui.screens.AuthGateScreen
 import com.example.ui.screens.BookingCalendarScreen
 import com.example.ui.theme.MyApplicationTheme
 import com.google.firebase.Firebase
@@ -34,6 +49,8 @@ import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 
 const val ROUTE_CALENDAR = "booking_calendar"
 const val ROUTE_ADMIN_LOGIN = "admin_login"
@@ -60,10 +77,39 @@ class MainActivity : ComponentActivity() {
 fun AppNavigation(auth: FirebaseAuth = Firebase.auth) {
   val currentUser by
     auth.authStateFlow().collectAsStateWithLifecycle(initialValue = auth.currentUser)
+  var retryKey by remember { mutableIntStateOf(0) }
+  var authError by remember { mutableStateOf<String?>(null) }
+  val scope = rememberCoroutineScope()
+
+  LaunchedEffect(auth, currentUser, retryKey) {
+    if (currentUser == null) {
+      authError = null
+      try {
+        auth.signInAnonymously().await()
+      } catch (error: Exception) {
+        authError = error.localizedMessage ?: "Unable to connect to the booking service."
+      }
+    }
+  }
 
   val user = currentUser
   if (user == null) {
-    AuthGateScreen(onAuthSuccess = {})
+    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+      Column(
+        modifier = Modifier.fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+      ) {
+        if (authError == null) {
+          CircularProgressIndicator()
+          Text("Opening Shree Banquet Hall…")
+        } else {
+          Text("Unable to open the booking calendar.")
+          Text(authError!!)
+          Button(onClick = { retryKey++ }) { Text("Retry") }
+        }
+      }
+    }
   } else {
     key(user.uid) {
       AuthenticatedHallApp(
@@ -125,7 +171,17 @@ private fun AuthenticatedHallApp(
         onLoginSuccess = { navController.popBackStack() },
         onBackToCalendar = { navController.popBackStack() },
         onSwitchGoogleAccount = {
-          signOut(credentialManager = credentialManager, scope = scope)
+          onGoogleSignInClicked(
+            context = context,
+            credentialManager = credentialManager,
+            onAuthSuccess = {
+              Toast.makeText(context, "Google account connected. Open Admin Login again.", Toast.LENGTH_LONG).show()
+            },
+            onAuthError = { message ->
+              Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+            },
+            scope = scope,
+          )
         },
       )
     }
