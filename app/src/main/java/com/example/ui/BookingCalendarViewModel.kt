@@ -44,6 +44,7 @@ class BookingCalendarViewModel(
   val selectedDate: StateFlow<HallDate?> = _selectedDate.asStateFlow()
   private val _isAuthorizedAdmin = MutableStateFlow(false)
   val isAuthorizedAdmin: StateFlow<Boolean> = _isAuthorizedAdmin.asStateFlow()
+  val currentUserEmail: String? get() = if (_isAdminModeUnlocked.value) BookingRepository.ADMIN_EMAIL else null
   private val _isAdminModeUnlocked = MutableStateFlow(false)
   val isAdminModeUnlocked: StateFlow<Boolean> = _isAdminModeUnlocked.asStateFlow()
   private val _adminLoginFeedback = MutableStateFlow<AdminLoginFeedback>(AdminLoginFeedback.Idle)
