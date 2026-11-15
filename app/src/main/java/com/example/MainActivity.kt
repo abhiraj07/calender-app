@@ -1,7 +1,6 @@
 package com.example
 
 import android.os.Bundle
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -16,16 +15,12 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
-import androidx.credentials.CredentialManager
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -34,8 +29,6 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.example.auth.onGoogleSignInClicked
-import com.example.auth.signOut
 import com.example.data.BookingRepository
 import com.example.ui.BookingCalendarViewModel
 import com.example.ui.screens.AdminLoginScreen
@@ -111,12 +104,10 @@ fun AppNavigation(auth: FirebaseAuth = Firebase.auth) {
       }
     }
   } else {
-    key(user.uid) {
-      AuthenticatedHallApp(
-        currentUserId = user.uid,
-        currentUserEmail = user.email,
-      )
-    }
+    AuthenticatedHallApp(
+      currentUserId = user.uid,
+      currentUserEmail = user.email,
+    )
   }
 }
 
@@ -125,9 +116,6 @@ private fun AuthenticatedHallApp(
   currentUserId: String,
   currentUserEmail: String?,
 ) {
-  val context = LocalContext.current
-  val scope = rememberCoroutineScope()
-  val credentialManager = remember(context) { CredentialManager.create(context) }
 
   val viewModel: BookingCalendarViewModel =
     viewModel(
@@ -161,7 +149,8 @@ private fun AuthenticatedHallApp(
           navController.navigate(ROUTE_ADMIN_LOGIN) { launchSingleTop = true }
         },
         onSignOutClick = {
-          signOut(credentialManager = credentialManager, scope = scope)
+          viewModel.lockAdminMode()
+          Firebase.auth.signOut()
         },
       )
     }
@@ -170,19 +159,6 @@ private fun AuthenticatedHallApp(
         viewModel = viewModel,
         onLoginSuccess = { navController.popBackStack() },
         onBackToCalendar = { navController.popBackStack() },
-        onSwitchGoogleAccount = {
-          onGoogleSignInClicked(
-            context = context,
-            credentialManager = credentialManager,
-            onAuthSuccess = {
-              Toast.makeText(context, "Google account connected. Open Admin Login again.", Toast.LENGTH_LONG).show()
-            },
-            onAuthError = { message ->
-              Toast.makeText(context, message, Toast.LENGTH_LONG).show()
-            },
-            scope = scope,
-          )
-        },
       )
     }
   }
