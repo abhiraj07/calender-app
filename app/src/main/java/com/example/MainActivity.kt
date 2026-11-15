@@ -17,6 +17,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -83,6 +84,7 @@ fun AppNavigation(auth: FirebaseAuth = Firebase.auth) {
   }
 
   val user = currentUser
+  val currentAuthError = authError
   if (user == null) {
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
       Column(
@@ -90,12 +92,12 @@ fun AppNavigation(auth: FirebaseAuth = Firebase.auth) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
       ) {
-        if (authError == null) {
+        if (currentAuthError == null) {
           CircularProgressIndicator()
           Text("Opening Shree Banquet Hall…")
         } else {
           Text("Unable to open the booking calendar.")
-          Text(authError!!)
+          Text(currentAuthError)
           Button(onClick = { retryKey++ }) { Text("Retry") }
         }
       }
