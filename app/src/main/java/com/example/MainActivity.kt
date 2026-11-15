@@ -21,7 +21,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
@@ -34,24 +33,10 @@ import com.example.ui.BookingCalendarViewModel
 import com.example.ui.screens.AdminLoginScreen
 import com.example.ui.screens.BookingCalendarScreen
 import com.example.ui.theme.MyApplicationTheme
-import com.google.firebase.Firebase
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.auth.FirebaseUser
-import com.google.firebase.auth.auth
-import com.google.firebase.firestore.FirebaseFirestore
-import kotlinx.coroutines.channels.awaitClose
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
-import kotlinx.coroutines.tasks.await
+
 
 const val ROUTE_CALENDAR = "booking_calendar"
 const val ROUTE_ADMIN_LOGIN = "admin_login"
-
-internal fun FirebaseAuth.authStateFlow(): Flow<FirebaseUser?> = callbackFlow {
-  val listener = FirebaseAuth.AuthStateListener { auth -> trySend(auth.currentUser) }
-  addAuthStateListener(listener)
-  awaitClose { removeAuthStateListener(listener) }
-}
 
 class MainActivity : ComponentActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
@@ -66,71 +51,22 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun AppNavigation(auth: FirebaseAuth = Firebase.auth) {
-  val currentUser by
-    auth.authStateFlow().collectAsStateWithLifecycle(initialValue = auth.currentUser)
-  var retryKey by remember { mutableIntStateOf(0) }
-  var authError by remember { mutableStateOf<String?>(null) }
-
-  LaunchedEffect(auth, currentUser, retryKey) {
-    if (currentUser == null) {
-      authError = null
-      try {
-        auth.signInAnonymously().await()
-      } catch (error: Exception) {
-        authError = error.localizedMessage ?: "Unable to connect to the booking service."
-      }
-    }
-  }
-
-  val user = currentUser
-  val currentAuthError = authError
-  if (user == null) {
-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-      Column(
-        modifier = Modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-      ) {
-        if (currentAuthError == null) {
-          CircularProgressIndicator()
-          Text("Opening Shree Banquet Hall…")
-        } else {
-          Text("Unable to open the booking calendar.")
-          Text(currentAuthError)
-          Button(onClick = { retryKey++ }) { Text("Retry") }
-        }
-      }
-    }
-  } else {
-    AuthenticatedHallApp(
-      currentUserId = user.uid,
-      currentUserEmail = user.email,
-    )
-  }
+fun AppNavigation() {
+  AuthenticatedHallApp()
 }
 
 @Composable
-private fun AuthenticatedHallApp(
-  currentUserId: String,
-  currentUserEmail: String?,
-) {
+private fun AuthenticatedHallApp() {
 
   val viewModel: BookingCalendarViewModel =
     viewModel(
       factory =
         viewModelFactory {
           initializer {
-            val app =
-              checkNotNull(this[APPLICATION_KEY]) {
-                "APPLICATION_KEY missing from CreationExtras"
-              }
-            val databaseId = app.getString(R.string.firestore_database_id)
-            val db = FirebaseFirestore.getInstance(databaseId)
             BookingCalendarViewModel(
-              repository = BookingRepository(db),
-              currentUserId = currentUserId,
-              currentUserEmail = currentUserEmail,
+              repository = BookingRepository(),
+              currentUserId = "",
+              currentUserEmail = null,
             )
           }
         },

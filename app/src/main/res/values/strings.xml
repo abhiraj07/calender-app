@@ -25,11 +25,11 @@
     <string name="status_pending">Pending Hold</string>
     <string name="status_booked">Booked</string>
     <string name="status_past">Past Date</string>
-    <string name="save_booking">Save Booking Status</string>
-    <string name="clear_booking">Mark Available &amp; Clear</string>
+    <string name="save_booking">Save Booking</string>
+    <string name="clear_booking">Clear Booking</string>
     <string name="client_name_label">Client / Host Name</string>
     <string name="client_phone_label">Phone Number</string>
-    <string name="event_type_label">Event Type (e.g. Wedding, Reception)</string>
+    <string name="event_type_label">Event Type</string>
     <string name="notes_label">Private Management Notes</string>
     <string name="close">Close</string>
 </resources>
