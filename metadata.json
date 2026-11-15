@@ -1,0 +1,6 @@
+{
+  "name": "Shree Banquet Hall",
+  "description": "Private booking calendar and date availability manager for Shree Banquet Hall with Admin Login.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

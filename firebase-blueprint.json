@@ -1,0 +1,115 @@
+{
+  "entities": {
+    "CalendarDate": {
+      "title": "CalendarDate",
+      "description": "Public date availability state for Shree Banquet Hall without any client PII.",
+      "type": "object",
+      "properties": {
+        "dateKey": {
+          "type": "string",
+          "description": "ISO date key in YYYY-MM-DD format matching document ID."
+        },
+        "yearMonth": {
+          "type": "string",
+          "description": "Year and month key in YYYY-MM format."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["available", "pending", "booked"],
+          "description": "Booking availability status for the date."
+        },
+        "isPublic": {
+          "type": "boolean",
+          "description": "Public calendar visibility flag (always true for public availability docs)."
+        },
+        "updatedByUid": {
+          "type": "string",
+          "description": "UID of the admin who last updated this date."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of the last update (FieldValue.serverTimestamp())."
+        }
+      },
+      "required": ["dateKey", "yearMonth", "status", "isPublic", "updatedByUid", "updatedAt"]
+    },
+    "AdminBooking": {
+      "title": "AdminBooking",
+      "description": "Private admin-only booking details and client contact records for a specific date.",
+      "type": "object",
+      "properties": {
+        "dateKey": {
+          "type": "string",
+          "description": "ISO date key in YYYY-MM-DD format matching document ID."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["available", "pending", "booked"],
+          "description": "Current booking status."
+        },
+        "clientName": {
+          "type": "string",
+          "description": "Client or host full name."
+        },
+        "clientPhone": {
+          "type": "string",
+          "description": "Client contact phone number."
+        },
+        "eventType": {
+          "type": "string",
+          "description": "Type of celebration (e.g., Wedding, Reception, Engagement)."
+        },
+        "notes": {
+          "type": "string",
+          "description": "Private management notes and advance/package details."
+        },
+        "updatedByUid": {
+          "type": "string",
+          "description": "UID of the admin who last modified this booking record."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of creation (FieldValue.serverTimestamp())."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of last update (FieldValue.serverTimestamp())."
+        }
+      },
+      "required": ["dateKey", "status", "clientName", "clientPhone", "eventType", "notes", "updatedByUid", "createdAt", "updatedAt"]
+    },
+    "AdminUser": {
+      "title": "AdminUser",
+      "description": "Authorized banquet hall administrator record.",
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "description": "Verified admin email address."
+        },
+        "role": {
+          "type": "string",
+          "description": "Admin role label."
+        }
+      },
+      "required": ["email", "role"]
+    }
+  },
+  "firestore": {
+    "/calendar_dates/{dateKey}": {
+      "schema": { "$ref": "#/entities/CalendarDate" },
+      "description": "Public date availability statuses (Booked, Pending, Available) for Shree Banquet Hall."
+    },
+    "/admin_bookings/{dateKey}": {
+      "schema": { "$ref": "#/entities/AdminBooking" },
+      "description": "Admin-only private client booking details for Shree Banquet Hall."
+    },
+    "/admins/{adminUid}": {
+      "schema": { "$ref": "#/entities/AdminUser" },
+      "description": "Registry of additional authorized admin UIDs."
+    }
+  }
+}
