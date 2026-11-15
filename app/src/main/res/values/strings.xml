@@ -21,9 +21,6 @@
     <string name="username_or_email_hint">admin980123 or krshreebanquethall@gmail.com</string>
     <string name="password_label">Password</string>
     <string name="login_securely">Login securely</string>
-    <string name="sign_in_with_google">Sign in with Google</string>
-    <string name="google_gate_title">Welcome to Shree Banquet Hall</string>
-    <string name="google_gate_subtitle">Sign in with Google to view live date availability and manage private celebration bookings.</string>
     <string name="sign_out">Sign out</string>
     <string name="status_available">Available (Not Booked)</string>
     <string name="status_pending">Pending Hold</string>
