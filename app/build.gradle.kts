@@ -20,6 +20,8 @@ android {
     targetSdk = 36
     versionCode = 1
     versionName = "1.0"
+    buildConfigField("String", "SUPABASE_URL", "\"https://agshupnzhpeqiwezsnyp.supabase.co\"")
+    buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", "\"sb_publishable_-gIJozghyFLW9TQfwY3FxA_OWZI097M\"")
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
