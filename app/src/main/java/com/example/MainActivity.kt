@@ -47,7 +47,6 @@ fun AppNavigation() {
           viewModel.resetAdminLoginFeedback()
           navController.navigate(ROUTE_ADMIN_LOGIN) { launchSingleTop = true }
         },
-        onSignOutClick = { viewModel.lockAdminMode() },
       )
     }
     composable(ROUTE_ADMIN_LOGIN) {
