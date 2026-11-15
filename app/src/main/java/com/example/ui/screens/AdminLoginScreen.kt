@@ -147,7 +147,7 @@ fun AdminLoginScreen(
 
           Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(
-              text = stringResource(R.string.username_or_email_label),
+              text = stringResource(R.string.admin_username_label),
               style = MaterialTheme.typography.labelLarge,
               color = CharcoalText,
               fontSize = 13.sp,
@@ -162,7 +162,7 @@ fun AdminLoginScreen(
               },
               placeholder = {
                 Text(
-                  text = stringResource(R.string.username_or_email_hint),
+                  text = stringResource(R.string.admin_username_hint),
                   color = MutedSageText.copy(alpha = 0.7f),
                   fontSize = 13.sp,
                 )
@@ -170,7 +170,7 @@ fun AdminLoginScreen(
               singleLine = true,
               keyboardOptions =
                 KeyboardOptions(
-                  keyboardType = KeyboardType.Email,
+                  keyboardType = KeyboardType.Text,
                   imeAction = ImeAction.Next,
                 ),
               colors = textFieldColors,
