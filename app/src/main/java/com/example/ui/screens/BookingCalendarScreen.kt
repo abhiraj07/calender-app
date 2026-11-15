@@ -25,7 +25,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
-import androidx.compose.material.icons.automirrored.rounded.Logout
 import androidx.compose.material.icons.rounded.AdminPanelSettings
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -39,7 +38,6 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -85,7 +83,6 @@ import com.example.ui.theme.SoftGoldTint
 fun BookingCalendarScreen(
   viewModel: BookingCalendarViewModel,
   onNavigateToAdminLogin: () -> Unit,
-  onSignOutClick: () -> Unit,
 ) {
   val calendarState by viewModel.calendarDatesState.collectAsStateWithLifecycle()
   val adminBookings by viewModel.adminBookingsState.collectAsStateWithLifecycle()
@@ -235,10 +232,17 @@ fun BookingCalendarScreen(
               onDateClick = viewModel::selectDate,
             )
 
-            if (isAdminUnlocked && adminBookings.isNotEmpty()) {
+            val displayedMonthPrefix =
+              displayedMonth.year.toString() + "-" + displayedMonth.month.toString().padStart(2, '0')
+            val monthBookings =
+              adminBookings.values
+                .filter { it.dateKey.startsWith(displayedMonthPrefix) }
+                .sortedBy { it.dateKey }
+
+            if (isAdminUnlocked && monthBookings.isNotEmpty()) {
               Spacer(modifier = Modifier.height(20.dp))
               AdminUpcomingBookingsSection(
-                bookings = adminBookings.values.sortedBy { it.dateKey },
+                bookings = monthBookings,
                 onBookingClick = { dateKey ->
                   HallDate.fromKey(dateKey)?.let { viewModel.selectDate(it) }
                 },
@@ -247,42 +251,6 @@ fun BookingCalendarScreen(
           }
         }
 
-        Spacer(modifier = Modifier.height(20.dp))
-
-        Row(
-          modifier = Modifier.fillMaxWidth(),
-          horizontalArrangement = Arrangement.Center,
-          verticalAlignment = Alignment.CenterVertically,
-        ) {
-          val emailLabel = viewModel.currentUserEmail
-          if (!emailLabel.isNullOrBlank()) {
-            Text(
-              text = emailLabel,
-              style = MaterialTheme.typography.bodyMedium,
-              color = MutedSageText,
-              fontSize = 12.sp,
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-          }
-          TextButton(
-            onClick = onSignOutClick,
-            modifier = Modifier.heightIn(min = 48.dp).testTag("sign_out_button"),
-          ) {
-            Icon(
-              imageVector = Icons.AutoMirrored.Rounded.Logout,
-              contentDescription = null,
-              tint = EmeraldDeep,
-              modifier = Modifier.size(16.dp),
-            )
-            Spacer(modifier = Modifier.width(6.dp))
-            Text(
-              text = stringResource(R.string.sign_out),
-              color = EmeraldDeep,
-              fontWeight = FontWeight.SemiBold,
-              fontSize = 13.sp,
-            )
-          }
-        }
       }
     }
   }
