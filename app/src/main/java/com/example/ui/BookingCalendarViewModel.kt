@@ -112,7 +112,6 @@ class BookingCalendarViewModel(
   init {
     viewModelScope.launch {
       _isAuthorizedAdmin.value = repository.checkIsAdminAccount()
-      _isAdminModeUnlocked.value = _isAuthorizedAdmin.value
     }
   }
 
