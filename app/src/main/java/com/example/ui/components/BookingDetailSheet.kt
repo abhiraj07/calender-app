@@ -208,7 +208,7 @@ fun BookingDetailSheet(
 
         OutlinedTextField(
           value = clientName,
-          onValueChange = { clientName = it },
+          onValueChange = { clientName = it.take(100) },
           label = { Text(stringResource(R.string.client_name_label)) },
           singleLine = true,
           colors = fieldColors,
@@ -218,7 +218,7 @@ fun BookingDetailSheet(
 
         OutlinedTextField(
           value = clientPhone,
-          onValueChange = { clientPhone = it },
+          onValueChange = { clientPhone = it.take(30) },
           label = { Text(stringResource(R.string.client_phone_label)) },
           singleLine = true,
           colors = fieldColors,
@@ -228,7 +228,7 @@ fun BookingDetailSheet(
 
         OutlinedTextField(
           value = eventType,
-          onValueChange = { eventType = it },
+          onValueChange = { eventType = it.take(60) },
           label = { Text(stringResource(R.string.event_type_label)) },
           singleLine = true,
           colors = fieldColors,
@@ -238,7 +238,7 @@ fun BookingDetailSheet(
 
         OutlinedTextField(
           value = notes,
-          onValueChange = { notes = it },
+          onValueChange = { notes = it.take(500) },
           label = { Text(stringResource(R.string.notes_label)) },
           minLines = 2,
           maxLines = 4,
