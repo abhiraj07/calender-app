@@ -5,10 +5,10 @@ import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.providers.builtin.Email
 import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.postgrest
-import io.github.jan.supabase.postgrest.result.decodeList
 import io.github.jan.supabase.realtime.selectAsFlow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.first
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -51,7 +51,7 @@ class BookingRepository(
 
   suspend fun checkIsAdminAccount(): Boolean = try {
     client.auth.awaitInitialization()
-    client.from(ADMIN_USERS_TABLE).select().decodeList<AdminUserRow>().isNotEmpty()
+    client.from(ADMIN_USERS_TABLE).selectAsFlow(AdminUserRow::userId).first().isNotEmpty()
   } catch (error: kotlinx.coroutines.CancellationException) {
     throw error
   } catch (_: Exception) {
