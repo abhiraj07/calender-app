@@ -1,4 +1,4 @@
-@file:Suppress("OPT_IN_USAGE")
+@file:OptIn(io.github.jan.supabase.SupabaseExperimental::class)
 
 package com.example.data
 
