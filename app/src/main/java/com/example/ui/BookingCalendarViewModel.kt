@@ -9,7 +9,6 @@ import com.example.data.BookingStatus
 import com.example.data.CalendarDateEntry
 import com.example.data.HallDate
 import com.example.data.HallYearMonth
-import com.google.firebase.firestore.FirebaseFirestoreException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -32,7 +31,7 @@ sealed interface UiState<out T> {
 sealed interface AdminLoginFeedback {
   data object Idle : AdminLoginFeedback
   data object Success : AdminLoginFeedback
-  data class Error(val message: String, val requiresAdminGoogleAccount: Boolean = false) :
+  data class Error(val message: String) :
     AdminLoginFeedback
 }
 
@@ -71,14 +70,9 @@ class BookingCalendarViewModel(
         UiState.Success(it)
       }
       .catch { error ->
-        val firestoreError =
-          generateSequence(error) { it.cause }
-            .filterIsInstance<FirebaseFirestoreException>()
-            .firstOrNull()
-        if (firestoreError == null && error is CancellationException) throw error
-        val rootError = firestoreError ?: error
-        Log.w(TAG, "Error observing calendar dates", rootError)
-        emit(UiState.Error(rootError.message ?: "Failed to load booking calendar"))
+        if (error is CancellationException) throw error
+        Log.w(TAG, "Error observing calendar dates", error)
+        emit(UiState.Error(error.message ?: "Failed to load booking calendar"))
       }
       .stateIn(
         scope = viewModelScope,
@@ -91,12 +85,8 @@ class BookingCalendarViewModel(
       .flatMapLatest { unlocked ->
         if (unlocked) {
           repository.observeAdminBookings().catch { error ->
-            val firestoreError =
-              generateSequence(error) { it.cause }
-                .filterIsInstance<FirebaseFirestoreException>()
-                .firstOrNull()
-            if (firestoreError == null && error is CancellationException) throw error
-            Log.w(TAG, "Error observing admin bookings", firestoreError ?: error)
+            if (error is CancellationException) throw error
+            Log.w(TAG, "Error observing admin bookings", error)
             emit(emptyMap())
           }
         } else {
@@ -141,52 +131,52 @@ class BookingCalendarViewModel(
 
   fun attemptAdminLogin(usernameOrEmail: String, password: String) {
     val identifier = usernameOrEmail.trim().lowercase()
-    val pass = password.trim()
-
     if (identifier.isBlank()) {
-      _adminLoginFeedback.value = AdminLoginFeedback.Error("Please enter your admin username or email.")
+      _adminLoginFeedback.value = AdminLoginFeedback.Error("Please enter your admin username.")
       return
     }
-    if (pass.length < 4) {
-      _adminLoginFeedback.value = AdminLoginFeedback.Error("Please enter your admin password (at least 4 characters).")
+    if (password.isBlank()) {
+      _adminLoginFeedback.value = AdminLoginFeedback.Error("Please enter your admin password.")
       return
     }
-
-    val validAdminIdentifiers =
-      buildSet {
-        add(ADMIN_USERNAME)
-        add(BookingRepository.BOOTSTRAPPED_ADMIN_HALL)
-        add(BookingRepository.BOOTSTRAPPED_ADMIN_PRIMARY)
-        currentUserEmail?.lowercase()?.let { add(it) }
-      }
-
-    if (identifier !in validAdminIdentifiers) {
-      _adminLoginFeedback.value =
-        AdminLoginFeedback.Error("Unrecognized admin username or email.")
+    if (identifier != BookingRepository.ADMIN_USERNAME && identifier != BookingRepository.ADMIN_AUTH_EMAIL) {
+      _adminLoginFeedback.value = AdminLoginFeedback.Error("Enter the admin username.")
       return
     }
-
     viewModelScope.launch {
-      val authorized = repository.checkIsAdminAccount()
-      _isAuthorizedAdmin.value = authorized
-      if (!authorized) {
-        _adminLoginFeedback.value =
-          AdminLoginFeedback.Error(
-            message =
-              "Signed-in Google account (${currentUserEmail ?: "unknown"}) does not have admin write permissions. Sign in with the authorized admin Google account to manage bookings.",
-            requiresAdminGoogleAccount = true,
+      _adminLoginFeedback.value = AdminLoginFeedback.Idle
+      try {
+        val authorized = repository.signInAdmin(identifier, password)
+        _isAuthorizedAdmin.value = authorized
+        if (authorized) {
+          _isAdminModeUnlocked.value = true
+          _adminLoginFeedback.value = AdminLoginFeedback.Success
+        } else {
+          _adminLoginFeedback.value = AdminLoginFeedback.Error(
+            "Login failed. Check the admin username and password."
           )
-        return@launch
+        }
+      } catch (e: CancellationException) {
+        throw e
+      } catch (e: Exception) {
+        _adminLoginFeedback.value = AdminLoginFeedback.Error(
+          e.localizedMessage ?: "Unable to sign in. Please try again."
+        )
       }
-
-      _isAdminModeUnlocked.value = true
-      _adminLoginFeedback.value = AdminLoginFeedback.Success
     }
   }
 
   fun lockAdminMode() {
     _isAdminModeUnlocked.value = false
     _adminLoginFeedback.value = AdminLoginFeedback.Idle
+    viewModelScope.launch {
+      try {
+        repository.signOutAdmin()
+        _isAuthorizedAdmin.value = false
+      } catch (error: Exception) {
+        Log.w(TAG, "Unable to clear the Supabase admin session", error)
+      }
+    }
   }
 
   fun saveBooking(

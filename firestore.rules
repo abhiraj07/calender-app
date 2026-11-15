@@ -25,11 +25,8 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return isSignedIn() && (
-        (request.auth.token.email_verified == true && request.auth.token.email == 'abhiraj2482@gmail.com') ||
-        (request.auth.token.email_verified == true && request.auth.token.email == 'krshreebanquethall@gmail.com') ||
-        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
-      );
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
 
     function isValidDateKey(val) {
@@ -105,7 +102,7 @@ service cloud.firestore {
     // 2. Private Admin Booking Details (PII isolated strictly to verified Admins)
     match /admin_bookings/{dateKey} {
       allow get: if isAdmin() && isValidId(dateKey);
-      allow list: if isAdmin() && resource.data.dateKey is string;
+      allow list: if isAdmin();
 
       allow create: if isAdmin() &&
                        isValidId(dateKey) &&

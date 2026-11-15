@@ -25,7 +25,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
-import androidx.compose.material.icons.automirrored.rounded.Logout
 import androidx.compose.material.icons.rounded.AdminPanelSettings
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -39,7 +38,6 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -85,7 +83,6 @@ import com.example.ui.theme.SoftGoldTint
 fun BookingCalendarScreen(
   viewModel: BookingCalendarViewModel,
   onNavigateToAdminLogin: () -> Unit,
-  onSignOutClick: () -> Unit,
 ) {
   val calendarState by viewModel.calendarDatesState.collectAsStateWithLifecycle()
   val adminBookings by viewModel.adminBookingsState.collectAsStateWithLifecycle()
@@ -235,10 +232,29 @@ fun BookingCalendarScreen(
               onDateClick = viewModel::selectDate,
             )
 
-            if (isAdminUnlocked && adminBookings.isNotEmpty()) {
+            if (isAdminUnlocked) {
+              val monthPrefix = "%04d-%02d".format(displayedMonth.year, displayedMonth.month)
+              val combinedBookings = (state.data.keys + adminBookings.keys)
+                .filter { it.startsWith(monthPrefix) }
+                .mapNotNull { dateKey ->
+                  val publicEntry = state.data[dateKey]
+                  val privateEntry = adminBookings[dateKey]
+                  val status = publicEntry?.status ?: privateEntry?.status ?: return@mapNotNull null
+                  if (BookingStatus.fromValue(status) == BookingStatus.AVAILABLE) return@mapNotNull null
+                  AdminBookingEntry(
+                    id = dateKey,
+                    dateKey = dateKey,
+                    status = status,
+                    clientName = privateEntry?.clientName.orEmpty(),
+                    clientPhone = privateEntry?.clientPhone.orEmpty(),
+                    eventType = privateEntry?.eventType.orEmpty(),
+                    notes = privateEntry?.notes.orEmpty(),
+                  )
+                }
+                .sortedBy { it.dateKey }
               Spacer(modifier = Modifier.height(20.dp))
               AdminUpcomingBookingsSection(
-                bookings = adminBookings.values.sortedBy { it.dateKey },
+                bookings = combinedBookings,
                 onBookingClick = { dateKey ->
                   HallDate.fromKey(dateKey)?.let { viewModel.selectDate(it) }
                 },
@@ -249,40 +265,7 @@ fun BookingCalendarScreen(
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        Row(
-          modifier = Modifier.fillMaxWidth(),
-          horizontalArrangement = Arrangement.Center,
-          verticalAlignment = Alignment.CenterVertically,
-        ) {
-          val emailLabel = viewModel.currentUserEmail
-          if (!emailLabel.isNullOrBlank()) {
-            Text(
-              text = emailLabel,
-              style = MaterialTheme.typography.bodyMedium,
-              color = MutedSageText,
-              fontSize = 12.sp,
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-          }
-          TextButton(
-            onClick = onSignOutClick,
-            modifier = Modifier.heightIn(min = 48.dp).testTag("sign_out_button"),
-          ) {
-            Icon(
-              imageVector = Icons.AutoMirrored.Rounded.Logout,
-              contentDescription = null,
-              tint = EmeraldDeep,
-              modifier = Modifier.size(16.dp),
-            )
-            Spacer(modifier = Modifier.width(6.dp))
-            Text(
-              text = stringResource(R.string.sign_out),
-              color = EmeraldDeep,
-              fontWeight = FontWeight.SemiBold,
-              fontSize = 13.sp,
-            )
-          }
-        }
+
       }
     }
   }
@@ -644,13 +627,11 @@ private fun AdminUpcomingBookingsSection(
                 listOf(booking.clientName, booking.eventType)
                   .filter { it.isNotBlank() }
                   .joinToString(" • ")
-              if (summary.isNotBlank()) {
-                Text(
-                  text = summary,
-                  fontSize = 13.sp,
-                  color = MutedSageText,
-                )
-              }
+              Text(
+                text = summary.ifBlank { "Details not added" },
+                fontSize = 13.sp,
+                color = MutedSageText,
+              )
             }
             Spacer(modifier = Modifier.width(8.dp))
             Box(

@@ -29,7 +29,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
@@ -43,7 +42,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -58,7 +56,6 @@ import com.example.R
 import com.example.ui.AdminLoginFeedback
 import com.example.ui.BookingCalendarViewModel
 import com.example.ui.components.HallTopBar
-import com.example.ui.theme.BookedRed
 import com.example.ui.theme.CharcoalText
 import com.example.ui.theme.EmeraldDeep
 import com.example.ui.theme.GoldAccent
@@ -67,14 +64,12 @@ import com.example.ui.theme.IvoryCream
 import com.example.ui.theme.MutedSageText
 import com.example.ui.theme.PlayfairDisplayFontFamily
 import com.example.ui.theme.PureWarmWhite
-import com.example.ui.theme.SoftRedTint
 
 @Composable
 fun AdminLoginScreen(
   viewModel: BookingCalendarViewModel,
   onLoginSuccess: () -> Unit,
   onBackToCalendar: () -> Unit,
-  onSwitchGoogleAccount: () -> Unit,
 ) {
   BackHandler { onBackToCalendar() }
 
@@ -152,7 +147,7 @@ fun AdminLoginScreen(
 
           Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(
-              text = stringResource(R.string.username_or_email_label),
+              text = stringResource(R.string.admin_username_label),
               style = MaterialTheme.typography.labelLarge,
               color = CharcoalText,
               fontSize = 13.sp,
@@ -167,7 +162,7 @@ fun AdminLoginScreen(
               },
               placeholder = {
                 Text(
-                  text = stringResource(R.string.username_or_email_hint),
+                  text = stringResource(R.string.admin_username_hint),
                   color = MutedSageText.copy(alpha = 0.7f),
                   fontSize = 13.sp,
                 )
@@ -175,7 +170,7 @@ fun AdminLoginScreen(
               singleLine = true,
               keyboardOptions =
                 KeyboardOptions(
-                  keyboardType = KeyboardType.Email,
+                  keyboardType = KeyboardType.Text,
                   imeAction = ImeAction.Next,
                 ),
               colors = textFieldColors,
@@ -231,37 +226,12 @@ fun AdminLoginScreen(
 
           val errorFeedback = feedback as? AdminLoginFeedback.Error
           if (errorFeedback != null) {
-            Box(
-              modifier =
-                Modifier
-                  .fillMaxWidth()
-                  .clip(RoundedCornerShape(10.dp))
-                  .background(SoftRedTint)
-                  .padding(12.dp)
-            ) {
-              Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                  text = errorFeedback.message,
-                  style = MaterialTheme.typography.bodyMedium,
-                  color = BookedRed,
-                  fontSize = 13.sp,
-                )
-                if (errorFeedback.requiresAdminGoogleAccount) {
-                  OutlinedButton(
-                    onClick = onSwitchGoogleAccount,
-                    shape = RoundedCornerShape(8.dp),
-                    border = BorderStroke(1.dp, BookedRed.copy(alpha = 0.6f)),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = BookedRed),
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
-                  ) {
-                    Text(
-                      text = "Switch Google Account",
-                      fontWeight = FontWeight.SemiBold,
-                    )
-                  }
-                }
-              }
-            }
+            Text(
+              text = errorFeedback.message,
+              style = MaterialTheme.typography.bodyMedium,
+              color = MaterialTheme.colorScheme.error,
+              modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+            )
           }
 
           Spacer(modifier = Modifier.height(2.dp))

@@ -1,211 +1,97 @@
+@file:OptIn(io.github.jan.supabase.annotations.SupabaseExperimental::class)
+
 package com.example.data
 
-import android.content.Context
-import com.example.R
-import com.google.firebase.Firebase
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.auth.auth
-import com.google.firebase.firestore.DocumentSnapshot
-import com.google.firebase.firestore.FieldValue
-import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.FirebaseFirestoreException
-import com.google.firebase.firestore.snapshots
-import kotlinx.coroutines.CancellationException
+import io.github.jan.supabase.auth.auth
+import io.github.jan.supabase.auth.providers.builtin.Email
+import io.github.jan.supabase.postgrest.from
+import io.github.jan.supabase.postgrest.postgrest
+import io.github.jan.supabase.realtime.selectAsFlow
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.flow.first
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 class BookingRepository(
-  private val db: FirebaseFirestore,
-  private val auth: FirebaseAuth = Firebase.auth,
+  private val client: io.github.jan.supabase.SupabaseClient = SupabaseClientProvider.client,
 ) {
-  constructor(context: Context) : this(
-    db =
-      FirebaseFirestore.getInstance(
-        context.applicationContext.getString(R.string.firestore_database_id)
-      ),
-    auth = Firebase.auth,
-  )
+  fun observePublicCalendarDates(): Flow<Map<String, CalendarDateEntry>> =
+    client.from(BOOKING_DATES_TABLE).selectAsFlow(BookingDateRow::bookingDate)
+      .map { rows -> rows.associate { row ->
+        row.bookingDate to CalendarDateEntry(id = row.bookingDate, dateKey = row.bookingDate, status = row.status)
+      } }
 
-  private fun requireUserId(): String =
-    auth.currentUser?.uid
-      ?: throw IllegalStateException("User must be signed in with Google before accessing Firestore.")
+  fun observeAdminBookings(): Flow<Map<String, AdminBookingEntry>> =
+    client.from(ADMIN_BOOKINGS_TABLE).selectAsFlow(AdminBookingRow::bookingDate)
+      .map { rows -> rows.associate { row ->
+        row.bookingDate to AdminBookingEntry(
+          id = row.bookingDate, dateKey = row.bookingDate, status = row.status,
+          clientName = row.clientName, clientPhone = row.clientPhone,
+          eventType = row.eventType, notes = row.notes
+        )
+      } }
 
-  fun observePublicCalendarDates(): Flow<Map<String, CalendarDateEntry>> {
-    val path = CALENDAR_DATES_COLLECTION
-    return db
-      .collection(path)
-      .whereEqualTo("isPublic", true)
-      .snapshots()
-      .map { snapshot ->
-        snapshot
-          .toObjects(
-            CalendarDateEntry::class.java,
-            DocumentSnapshot.ServerTimestampBehavior.ESTIMATE,
-          )
-          .associateBy { it.dateKey.ifBlank { it.id } }
-      }
-      .catch { error ->
-        val firestoreError =
-          generateSequence(error) { it.cause }
-            .filterIsInstance<FirebaseFirestoreException>()
-            .firstOrNull()
-        if (firestoreError == null && error is CancellationException) throw error
-        val exceptionToLog = firestoreError ?: (error as? Exception)
-        if (exceptionToLog != null && auth.currentUser != null) {
-          handleFirestoreError(exceptionToLog, OperationType.LIST, path)
-        }
-        throw error
-      }
-  }
-
-  fun observeAdminBookings(): Flow<Map<String, AdminBookingEntry>> {
-    val path = ADMIN_BOOKINGS_COLLECTION
-    return db
-      .collection(path)
-      .snapshots()
-      .map { snapshot ->
-        snapshot
-          .toObjects(
-            AdminBookingEntry::class.java,
-            DocumentSnapshot.ServerTimestampBehavior.ESTIMATE,
-          )
-          .associateBy { it.dateKey.ifBlank { it.id } }
-      }
-      .catch { error ->
-        val firestoreError =
-          generateSequence(error) { it.cause }
-            .filterIsInstance<FirebaseFirestoreException>()
-            .firstOrNull()
-        if (firestoreError == null && error is CancellationException) throw error
-        val exceptionToLog = firestoreError ?: (error as? Exception)
-        if (exceptionToLog != null && auth.currentUser != null) {
-          handleFirestoreError(exceptionToLog, OperationType.LIST, path)
-        }
-        throw error
-      }
-  }
-
-  suspend fun checkIsAdminAccount(): Boolean {
-    val user = auth.currentUser ?: return false
-    val email = user.email?.lowercase()
-    if (user.isEmailVerified && (email == BOOTSTRAPPED_ADMIN_PRIMARY || email == BOOTSTRAPPED_ADMIN_HALL)) {
-      return true
-    }
-    val docPath = "$ADMINS_COLLECTION/${user.uid}"
+  suspend fun signInAdmin(usernameOrEmail: String, password: String): Boolean {
+    val identifier = usernameOrEmail.trim().lowercase()
+    if ((identifier != ADMIN_USERNAME && identifier != ADMIN_AUTH_EMAIL) || password.isBlank()) return false
     return try {
-      db.collection(ADMINS_COLLECTION).document(user.uid).get().await().exists()
-    } catch (e: CancellationException) {
-      throw e
-    } catch (e: Exception) {
-      handleFirestoreError(e, OperationType.GET, docPath)
+      client.auth.signInWith(Email) {
+        email = ADMIN_AUTH_EMAIL
+        this.password = password
+      }
+      val authorized = checkIsAdminAccount()
+      if (!authorized) client.auth.signOut()
+      authorized
+    } catch (error: kotlinx.coroutines.CancellationException) {
+      throw error
+    } catch (_: Exception) {
       false
     }
   }
 
+  suspend fun checkIsAdminAccount(): Boolean = try {
+    client.auth.awaitInitialization()
+    client.from(ADMIN_USERS_TABLE).selectAsFlow(AdminUserRow::userId).first().isNotEmpty()
+  } catch (error: kotlinx.coroutines.CancellationException) {
+    throw error
+  } catch (_: Exception) {
+    false
+  }
+
+  suspend fun signOutAdmin() {
+    client.auth.signOut()
+  }
+
   suspend fun saveBooking(
-    dateKey: String,
-    status: BookingStatus,
-    clientName: String,
-    clientPhone: String,
-    eventType: String,
-    notes: String,
+    dateKey: String, status: BookingStatus, clientName: String,
+    clientPhone: String, eventType: String, notes: String,
   ) {
-    val uid = requireUserId()
-    val yearMonth = dateKey.take(7)
-    val publicDocRef = db.collection(CALENDAR_DATES_COLLECTION).document(dateKey)
-    val adminDocRef = db.collection(ADMIN_BOOKINGS_COLLECTION).document(dateKey)
-
-    try {
-      val publicExists = publicDocRef.get().await().exists()
-      val adminExists = adminDocRef.get().await().exists()
-      val batch = db.batch()
-
-      if (publicExists) {
-        batch.update(
-          publicDocRef,
-          mapOf(
-            "status" to status.value,
-            "updatedByUid" to uid,
-            "updatedAt" to FieldValue.serverTimestamp(),
-          ),
-        )
-      } else {
-        batch.set(
-          publicDocRef,
-          mapOf(
-            "dateKey" to dateKey,
-            "yearMonth" to yearMonth,
-            "status" to status.value,
-            "isPublic" to true,
-            "updatedByUid" to uid,
-            "updatedAt" to FieldValue.serverTimestamp(),
-          ),
-        )
-      }
-
-      if (adminExists) {
-        batch.update(
-          adminDocRef,
-          mapOf(
-            "status" to status.value,
-            "clientName" to clientName.trim().take(100),
-            "clientPhone" to clientPhone.trim().take(30),
-            "eventType" to eventType.trim().take(60),
-            "notes" to notes.trim().take(500),
-            "updatedByUid" to uid,
-            "updatedAt" to FieldValue.serverTimestamp(),
-          ),
-        )
-      } else {
-        batch.set(
-          adminDocRef,
-          mapOf(
-            "dateKey" to dateKey,
-            "status" to status.value,
-            "clientName" to clientName.trim().take(100),
-            "clientPhone" to clientPhone.trim().take(30),
-            "eventType" to eventType.trim().take(60),
-            "notes" to notes.trim().take(500),
-            "updatedByUid" to uid,
-            "createdAt" to FieldValue.serverTimestamp(),
-            "updatedAt" to FieldValue.serverTimestamp(),
-          ),
-        )
-      }
-
-      batch.commit().await()
-    } catch (e: CancellationException) {
-      throw e
-    } catch (e: Exception) {
-      handleFirestoreError(e, OperationType.WRITE, publicDocRef.path)
-      throw e
+    if (status == BookingStatus.AVAILABLE) {
+      clearBooking(dateKey)
+      return
     }
+    client.postgrest.rpc("save_shree_booking", buildJsonObject {
+      put("p_booking_date", dateKey)
+      put("p_status", status.value)
+      put("p_client_name", clientName.trim().take(100))
+      put("p_client_phone", clientPhone.trim().take(30))
+      put("p_event_type", eventType.trim().take(60))
+      put("p_notes", notes.trim().take(500))
+    })
   }
 
   suspend fun clearBooking(dateKey: String) {
-    requireUserId()
-    val publicDocRef = db.collection(CALENDAR_DATES_COLLECTION).document(dateKey)
-    val adminDocRef = db.collection(ADMIN_BOOKINGS_COLLECTION).document(dateKey)
-    try {
-      val batch = db.batch()
-      batch.delete(publicDocRef)
-      batch.delete(adminDocRef)
-      batch.commit().await()
-    } catch (e: CancellationException) {
-      throw e
-    } catch (e: Exception) {
-      handleFirestoreError(e, OperationType.DELETE, publicDocRef.path)
-      throw e
-    }
+    client.postgrest.rpc("clear_shree_booking", buildJsonObject {
+      put("p_booking_date", dateKey)
+    })
   }
 
   companion object {
-    const val CALENDAR_DATES_COLLECTION = "calendar_dates"
-    const val ADMIN_BOOKINGS_COLLECTION = "admin_bookings"
-    const val ADMINS_COLLECTION = "admins"
-    const val BOOTSTRAPPED_ADMIN_PRIMARY = "abhiraj2482@gmail.com"
-    const val BOOTSTRAPPED_ADMIN_HALL = "krshreebanquethall@gmail.com"
+    const val BOOKING_DATES_TABLE = "public_booking_calendar"
+    const val ADMIN_BOOKINGS_TABLE = "admin_bookings"
+    const val ADMIN_USERS_TABLE = "admin_users"
+    const val ADMIN_USERNAME = "admin980123"
+    const val ADMIN_AUTH_EMAIL = "krshreebanquethall@gmail.com"
   }
 }
