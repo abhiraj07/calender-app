@@ -16,7 +16,7 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.tasks.await
 
-class BookingRepository(
+class LegacyFirebaseBookingRepository(
   private val db: FirebaseFirestore,
   private val auth: FirebaseAuth = Firebase.auth,
 ) {
