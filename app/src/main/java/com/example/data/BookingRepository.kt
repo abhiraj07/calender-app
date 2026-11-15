@@ -88,7 +88,7 @@ class BookingRepository(
   }
 
   companion object {
-    const val BOOKING_DATES_TABLE = "booking_dates"
+    const val BOOKING_DATES_TABLE = "public_booking_calendar"
     const val ADMIN_BOOKINGS_TABLE = "admin_bookings"
     const val ADMIN_USERS_TABLE = "admin_users"
     const val ADMIN_USERNAME = "admin980123"
