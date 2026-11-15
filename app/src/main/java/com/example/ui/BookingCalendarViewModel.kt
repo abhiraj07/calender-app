@@ -142,15 +142,15 @@ class BookingCalendarViewModel(
   fun attemptAdminLogin(usernameOrEmail: String, password: String) {
     val identifier = usernameOrEmail.trim().lowercase()
     if (identifier.isBlank()) {
-      _adminLoginFeedback.value = AdminLoginFeedback.Error("Please enter your admin username or email.")
+      _adminLoginFeedback.value = AdminLoginFeedback.Error("Please enter your admin username.")
       return
     }
     if (password.isBlank()) {
       _adminLoginFeedback.value = AdminLoginFeedback.Error("Please enter your admin password.")
       return
     }
-    if (identifier != BookingRepository.ADMIN_USERNAME && identifier != BookingRepository.BOOTSTRAPPED_ADMIN_HALL) {
-      _adminLoginFeedback.value = AdminLoginFeedback.Error("Use admin980123 or the registered admin email.")
+    if (identifier != BookingRepository.ADMIN_USERNAME) {
+      _adminLoginFeedback.value = AdminLoginFeedback.Error("Enter the admin username.")
       return
     }
     viewModelScope.launch {
@@ -163,7 +163,7 @@ class BookingCalendarViewModel(
           _adminLoginFeedback.value = AdminLoginFeedback.Success
         } else {
           _adminLoginFeedback.value = AdminLoginFeedback.Error(
-            "Login failed. Check the password and make sure the admin email is verified."
+            "Login failed. Check the admin username and password."
           )
         }
       } catch (e: CancellationException) {
