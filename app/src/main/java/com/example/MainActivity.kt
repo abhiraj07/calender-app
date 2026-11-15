@@ -17,7 +17,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -42,7 +41,6 @@ import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
 const val ROUTE_CALENDAR = "booking_calendar"
@@ -72,7 +70,6 @@ fun AppNavigation(auth: FirebaseAuth = Firebase.auth) {
     auth.authStateFlow().collectAsStateWithLifecycle(initialValue = auth.currentUser)
   var retryKey by remember { mutableIntStateOf(0) }
   var authError by remember { mutableStateOf<String?>(null) }
-  val scope = rememberCoroutineScope()
 
   LaunchedEffect(auth, currentUser, retryKey) {
     if (currentUser == null) {
@@ -119,7 +116,6 @@ private fun AuthenticatedHallApp(
 
   val viewModel: BookingCalendarViewModel =
     viewModel(
-      key = currentUserId,
       factory =
         viewModelFactory {
           initializer {
