@@ -12,6 +12,8 @@ import com.example.data.HallYearMonth
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -39,6 +41,9 @@ class BookingCalendarViewModel(
   private val repository: BookingRepository,
 ) : ViewModel() {
   private val _displayedMonth = MutableStateFlow(HallYearMonth.current())
+  private val refreshTrigger = MutableStateFlow(0)
+  private val _isRefreshing = MutableStateFlow(false)
+  val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
   val displayedMonth: StateFlow<HallYearMonth> = _displayedMonth.asStateFlow()
   private val _selectedDate = MutableStateFlow<HallDate?>(null)
   val selectedDate: StateFlow<HallDate?> = _selectedDate.asStateFlow()
@@ -55,7 +60,7 @@ class BookingCalendarViewModel(
   val actionMessage: StateFlow<String?> = _actionMessage.asStateFlow()
 
   val calendarDatesState: StateFlow<UiState<Map<String, CalendarDateEntry>>> =
-    repository.observePublicCalendarDates()
+    refreshTrigger.flatMapLatest { repository.observePublicCalendarDates() }
       .map<Map<String, CalendarDateEntry>, UiState<Map<String, CalendarDateEntry>>> { UiState.Success(it) }
       .catch { error ->
         if (error is CancellationException) throw error
@@ -65,13 +70,25 @@ class BookingCalendarViewModel(
       .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), UiState.Loading)
 
   val adminBookingsState: StateFlow<Map<String, AdminBookingEntry>> =
-    _isAdminModeUnlocked.flatMapLatest { unlocked ->
+    combine(_isAdminModeUnlocked, refreshTrigger) { unlocked, _ -> unlocked }
+      .distinctUntilChanged()
+      .flatMapLatest { unlocked ->
       if (unlocked) repository.observeAdminBookings().catch { error ->
         if (error is CancellationException) throw error
         Log.w(TAG, "Error observing Supabase private bookings", error)
         emit(emptyMap())
       } else flowOf(emptyMap())
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), emptyMap())
+
+  fun refreshCalendar() {
+    if (_isRefreshing.value) return
+    _isRefreshing.value = true
+    refreshTrigger.value += 1
+    viewModelScope.launch {
+      kotlinx.coroutines.delay(900)
+      _isRefreshing.value = false
+    }
+  }
 
   fun previousMonth() { _displayedMonth.value = _displayedMonth.value.plusMonths(-1) }
   fun nextMonth() { _displayedMonth.value = _displayedMonth.value.plusMonths(1) }
@@ -114,6 +131,7 @@ class BookingCalendarViewModel(
       _isSavingBooking.value = true
       try {
         repository.saveBooking(dateKey, status, clientName, clientPhone, eventType, notes)
+        refreshTrigger.value += 1
         _actionMessage.value = "Updated $dateKey to ${status.label}"
         _selectedDate.value = null
       } catch (e: CancellationException) { throw e }
@@ -128,6 +146,7 @@ class BookingCalendarViewModel(
       _isSavingBooking.value = true
       try {
         repository.clearBooking(dateKey)
+        refreshTrigger.value += 1
         _actionMessage.value = "$dateKey marked Available"
         _selectedDate.value = null
       } catch (e: CancellationException) { throw e }
