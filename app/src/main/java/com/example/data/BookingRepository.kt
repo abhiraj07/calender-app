@@ -1,7 +1,8 @@
 package com.example.data
 
-import io.github.jan.supabase.auth.providers.Email
+import io.github.jan.supabase.auth.providers.builtin.Email
 import io.github.jan.supabase.postgrest.from
+import io.github.jan.supabase.postgrest.result.decodeList
 import io.github.jan.supabase.realtime.selectAsFlow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -32,14 +33,21 @@ class BookingRepository(
         email = ADMIN_AUTH_EMAIL
         this.password = password
       }
-      checkIsAdminAccount()
+      val authorized = checkIsAdminAccount()
+      if (!authorized) client.auth.signOut()
+      authorized
+    } catch (error: kotlinx.coroutines.CancellationException) {
+      throw error
     } catch (_: Exception) {
       false
     }
   }
 
   suspend fun checkIsAdminAccount(): Boolean = try {
+    client.auth.awaitInitialization()
     client.from(ADMIN_USERS_TABLE).select().decodeList<AdminUserRow>().isNotEmpty()
+  } catch (error: kotlinx.coroutines.CancellationException) {
+    throw error
   } catch (_: Exception) {
     false
   }
