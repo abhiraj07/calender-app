@@ -38,6 +38,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -90,6 +91,7 @@ fun BookingCalendarScreen(
   val selectedDate by viewModel.selectedDate.collectAsStateWithLifecycle()
   val isAdminUnlocked by viewModel.isAdminModeUnlocked.collectAsStateWithLifecycle()
   val isSaving by viewModel.isSavingBooking.collectAsStateWithLifecycle()
+  val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
   val actionMessage by viewModel.actionMessage.collectAsStateWithLifecycle()
 
   val today = remember { HallDate.today() }
@@ -126,6 +128,11 @@ fun BookingCalendarScreen(
           .navigationBarsPadding(),
       contentAlignment = Alignment.TopCenter,
     ) {
+      PullToRefreshBox(
+        isRefreshing = isRefreshing,
+        onRefresh = viewModel::refreshCalendar,
+        modifier = Modifier.fillMaxSize(),
+      ) {
       Column(
         modifier =
           Modifier
@@ -251,6 +258,7 @@ fun BookingCalendarScreen(
           }
         }
 
+      }
       }
     }
   }
