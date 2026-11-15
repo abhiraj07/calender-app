@@ -1,6 +1,7 @@
+@file:Suppress("OPT_IN_USAGE")
+
 package com.example.data
 
-import io.github.jan.supabase.ExperimentalSupabaseApi
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.providers.builtin.Email
 import io.github.jan.supabase.postgrest.from
@@ -12,7 +13,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
-@OptIn(ExperimentalSupabaseApi::class)
 class BookingRepository(
   private val client: io.github.jan.supabase.SupabaseClient = SupabaseClientProvider.client,
 ) {
