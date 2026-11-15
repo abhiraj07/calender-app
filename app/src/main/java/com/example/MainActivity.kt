@@ -146,10 +146,6 @@ private fun AuthenticatedHallApp(
           viewModel.resetAdminLoginFeedback()
           navController.navigate(ROUTE_ADMIN_LOGIN) { launchSingleTop = true }
         },
-        onSignOutClick = {
-          viewModel.lockAdminMode()
-          Firebase.auth.signOut()
-        },
       )
     }
     composable(ROUTE_ADMIN_LOGIN) {
