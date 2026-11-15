@@ -32,7 +32,7 @@ sealed interface UiState<out T> {
 sealed interface AdminLoginFeedback {
   data object Idle : AdminLoginFeedback
   data object Success : AdminLoginFeedback
-  data class Error(val message: String, val requiresAdminGoogleAccount: Boolean = false) :
+  data class Error(val message: String) :
     AdminLoginFeedback
 }
 
@@ -112,6 +112,7 @@ class BookingCalendarViewModel(
   init {
     viewModelScope.launch {
       _isAuthorizedAdmin.value = repository.checkIsAdminAccount()
+      _isAdminModeUnlocked.value = _isAuthorizedAdmin.value
     }
   }
 
@@ -141,46 +142,38 @@ class BookingCalendarViewModel(
 
   fun attemptAdminLogin(usernameOrEmail: String, password: String) {
     val identifier = usernameOrEmail.trim().lowercase()
-    val pass = password.trim()
-
     if (identifier.isBlank()) {
       _adminLoginFeedback.value = AdminLoginFeedback.Error("Please enter your admin username or email.")
       return
     }
-    if (pass.length < 4) {
-      _adminLoginFeedback.value = AdminLoginFeedback.Error("Please enter your admin password (at least 4 characters).")
+    if (password.isBlank()) {
+      _adminLoginFeedback.value = AdminLoginFeedback.Error("Please enter your admin password.")
       return
     }
-
-    val validAdminIdentifiers =
-      buildSet {
-        add(ADMIN_USERNAME)
-        add(BookingRepository.BOOTSTRAPPED_ADMIN_HALL)
-        add(BookingRepository.BOOTSTRAPPED_ADMIN_PRIMARY)
-        currentUserEmail?.lowercase()?.let { add(it) }
-      }
-
-    if (identifier !in validAdminIdentifiers) {
-      _adminLoginFeedback.value =
-        AdminLoginFeedback.Error("Unrecognized admin username or email.")
+    if (identifier != BookingRepository.ADMIN_USERNAME && identifier != BookingRepository.BOOTSTRAPPED_ADMIN_HALL) {
+      _adminLoginFeedback.value = AdminLoginFeedback.Error("Use admin980123 or the registered admin email.")
       return
     }
-
     viewModelScope.launch {
-      val authorized = repository.checkIsAdminAccount()
-      _isAuthorizedAdmin.value = authorized
-      if (!authorized) {
-        _adminLoginFeedback.value =
-          AdminLoginFeedback.Error(
-            message =
-              "Signed-in Google account (${currentUserEmail ?: "unknown"}) does not have admin write permissions. Sign in with the authorized admin Google account to manage bookings.",
-            requiresAdminGoogleAccount = true,
+      _adminLoginFeedback.value = AdminLoginFeedback.Idle
+      try {
+        val authorized = repository.signInAdmin(identifier, password)
+        _isAuthorizedAdmin.value = authorized
+        if (authorized) {
+          _isAdminModeUnlocked.value = true
+          _adminLoginFeedback.value = AdminLoginFeedback.Success
+        } else {
+          _adminLoginFeedback.value = AdminLoginFeedback.Error(
+            "Login failed. Check the password and make sure the admin email is verified."
           )
-        return@launch
+        }
+      } catch (e: CancellationException) {
+        throw e
+      } catch (e: Exception) {
+        _adminLoginFeedback.value = AdminLoginFeedback.Error(
+          e.localizedMessage ?: "Unable to sign in. Please try again."
+        )
       }
-
-      _isAdminModeUnlocked.value = true
-      _adminLoginFeedback.value = AdminLoginFeedback.Success
     }
   }
 
