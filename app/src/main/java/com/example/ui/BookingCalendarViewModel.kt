@@ -139,7 +139,7 @@ class BookingCalendarViewModel(
       _adminLoginFeedback.value = AdminLoginFeedback.Error("Please enter your admin password.")
       return
     }
-    if (identifier != BookingRepository.ADMIN_USERNAME) {
+    if (identifier != BookingRepository.ADMIN_USERNAME && identifier != BookingRepository.ADMIN_AUTH_EMAIL) {
       _adminLoginFeedback.value = AdminLoginFeedback.Error("Enter the admin username.")
       return
     }
