@@ -89,19 +89,11 @@ class BookingRepository(
 
   suspend fun signInAdmin(usernameOrEmail: String, password: String): Boolean {
     val identifier = usernameOrEmail.trim().lowercase()
-    val email = when (identifier) {
-      ADMIN_USERNAME -> BOOTSTRAPPED_ADMIN_HALL
-      BOOTSTRAPPED_ADMIN_HALL -> BOOTSTRAPPED_ADMIN_HALL
-      else -> return false
-    }
+    if (identifier != ADMIN_USERNAME) return false
+    val email = ADMIN_AUTH_EMAIL
     return try {
       auth.signInWithEmailAndPassword(email, password).await()
-      val user = auth.currentUser ?: return false
-      if (!user.isEmailVerified) {
-        auth.signOut()
-        return false
-      }
-      checkIsAdminAccount()
+      auth.currentUser != null && checkIsAdminAccount()
     } catch (e: CancellationException) {
       throw e
     } catch (_: Exception) {
@@ -111,10 +103,6 @@ class BookingRepository(
 
   suspend fun checkIsAdminAccount(): Boolean {
     val user = auth.currentUser ?: return false
-    val email = user.email?.lowercase()
-    if (user.isEmailVerified && (email == BOOTSTRAPPED_ADMIN_PRIMARY || email == BOOTSTRAPPED_ADMIN_HALL)) {
-      return true
-    }
     val docPath = "$ADMINS_COLLECTION/${user.uid}"
     return try {
       db.collection(ADMINS_COLLECTION).document(user.uid).get().await().exists()
@@ -228,7 +216,6 @@ class BookingRepository(
     const val ADMIN_BOOKINGS_COLLECTION = "admin_bookings"
     const val ADMINS_COLLECTION = "admins"
     const val ADMIN_USERNAME = "admin980123"
-    const val BOOTSTRAPPED_ADMIN_PRIMARY = "abhiraj2482@gmail.com"
-    const val BOOTSTRAPPED_ADMIN_HALL = "krshreebanquethall@gmail.com"
+    const val ADMIN_AUTH_EMAIL = "admin980123@shreebanquethall.app"
   }
 }
