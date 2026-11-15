@@ -9,10 +9,11 @@ import com.example.data.BookingStatus
 import com.example.data.CalendarDateEntry
 import com.example.data.HallDate
 import com.example.data.HallYearMonth
-import com.google.firebase.firestore.FirebaseFirestoreException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -32,192 +33,110 @@ sealed interface UiState<out T> {
 sealed interface AdminLoginFeedback {
   data object Idle : AdminLoginFeedback
   data object Success : AdminLoginFeedback
-  data class Error(val message: String, val requiresAdminGoogleAccount: Boolean = false) :
-    AdminLoginFeedback
+  data class Error(val message: String, val requiresAdminGoogleAccount: Boolean = false) : AdminLoginFeedback
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class BookingCalendarViewModel(
   private val repository: BookingRepository,
-  val currentUserId: String,
-  val currentUserEmail: String?,
 ) : ViewModel() {
-
   private val _displayedMonth = MutableStateFlow(HallYearMonth.current())
+  private val refreshTrigger = MutableStateFlow(0)
+  private val _isRefreshing = MutableStateFlow(false)
+  val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
   val displayedMonth: StateFlow<HallYearMonth> = _displayedMonth.asStateFlow()
-
   private val _selectedDate = MutableStateFlow<HallDate?>(null)
   val selectedDate: StateFlow<HallDate?> = _selectedDate.asStateFlow()
-
   private val _isAuthorizedAdmin = MutableStateFlow(false)
   val isAuthorizedAdmin: StateFlow<Boolean> = _isAuthorizedAdmin.asStateFlow()
-
+  val currentUserEmail: String? get() = if (_isAdminModeUnlocked.value) BookingRepository.ADMIN_EMAIL else null
   private val _isAdminModeUnlocked = MutableStateFlow(false)
   val isAdminModeUnlocked: StateFlow<Boolean> = _isAdminModeUnlocked.asStateFlow()
-
   private val _adminLoginFeedback = MutableStateFlow<AdminLoginFeedback>(AdminLoginFeedback.Idle)
   val adminLoginFeedback: StateFlow<AdminLoginFeedback> = _adminLoginFeedback.asStateFlow()
-
   private val _isSavingBooking = MutableStateFlow(false)
   val isSavingBooking: StateFlow<Boolean> = _isSavingBooking.asStateFlow()
-
   private val _actionMessage = MutableStateFlow<String?>(null)
   val actionMessage: StateFlow<String?> = _actionMessage.asStateFlow()
 
   val calendarDatesState: StateFlow<UiState<Map<String, CalendarDateEntry>>> =
-    repository
-      .observePublicCalendarDates()
-      .map<Map<String, CalendarDateEntry>, UiState<Map<String, CalendarDateEntry>>> {
-        UiState.Success(it)
-      }
+    refreshTrigger.flatMapLatest { repository.observePublicCalendarDates() }
+      .map<Map<String, CalendarDateEntry>, UiState<Map<String, CalendarDateEntry>>> { UiState.Success(it) }
       .catch { error ->
-        val firestoreError =
-          generateSequence(error) { it.cause }
-            .filterIsInstance<FirebaseFirestoreException>()
-            .firstOrNull()
-        if (firestoreError == null && error is CancellationException) throw error
-        val rootError = firestoreError ?: error
-        Log.w(TAG, "Error observing calendar dates", rootError)
-        emit(UiState.Error(rootError.message ?: "Failed to load booking calendar"))
+        if (error is CancellationException) throw error
+        Log.w(TAG, "Error observing Supabase public calendar", error)
+        emit(UiState.Error(error.message ?: "Failed to load booking calendar"))
       }
-      .stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
-        initialValue = UiState.Loading,
-      )
+      .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), UiState.Loading)
 
   val adminBookingsState: StateFlow<Map<String, AdminBookingEntry>> =
-    _isAdminModeUnlocked
+    combine(_isAdminModeUnlocked, refreshTrigger) { unlocked, _ -> unlocked }
+      .distinctUntilChanged()
       .flatMapLatest { unlocked ->
-        if (unlocked) {
-          repository.observeAdminBookings().catch { error ->
-            val firestoreError =
-              generateSequence(error) { it.cause }
-                .filterIsInstance<FirebaseFirestoreException>()
-                .firstOrNull()
-            if (firestoreError == null && error is CancellationException) throw error
-            Log.w(TAG, "Error observing admin bookings", firestoreError ?: error)
-            emit(emptyMap())
-          }
-        } else {
-          flowOf(emptyMap())
-        }
-      }
-      .stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
-        initialValue = emptyMap(),
-      )
+      if (unlocked) repository.observeAdminBookings().catch { error ->
+        if (error is CancellationException) throw error
+        Log.w(TAG, "Error observing Supabase private bookings", error)
+        emit(emptyMap())
+      } else flowOf(emptyMap())
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), emptyMap())
 
-  init {
+  fun refreshCalendar() {
+    if (_isRefreshing.value) return
+    _isRefreshing.value = true
+    refreshTrigger.value += 1
     viewModelScope.launch {
-      _isAuthorizedAdmin.value = repository.checkIsAdminAccount()
+      kotlinx.coroutines.delay(900)
+      _isRefreshing.value = false
     }
   }
 
-  fun previousMonth() {
-    _displayedMonth.value = _displayedMonth.value.plusMonths(-1)
-  }
-
-  fun nextMonth() {
-    _displayedMonth.value = _displayedMonth.value.plusMonths(1)
-  }
-
-  fun selectDate(date: HallDate) {
-    _selectedDate.value = date
-  }
-
-  fun dismissSelectedDate() {
-    _selectedDate.value = null
-  }
-
-  fun clearActionMessage() {
-    _actionMessage.value = null
-  }
-
-  fun resetAdminLoginFeedback() {
-    _adminLoginFeedback.value = AdminLoginFeedback.Idle
-  }
+  fun previousMonth() { _displayedMonth.value = _displayedMonth.value.plusMonths(-1) }
+  fun nextMonth() { _displayedMonth.value = _displayedMonth.value.plusMonths(1) }
+  fun selectDate(date: HallDate) { _selectedDate.value = date }
+  fun dismissSelectedDate() { _selectedDate.value = null }
+  fun clearActionMessage() { _actionMessage.value = null }
+  fun resetAdminLoginFeedback() { _adminLoginFeedback.value = AdminLoginFeedback.Idle }
 
   fun attemptAdminLogin(usernameOrEmail: String, password: String) {
-    val identifier = usernameOrEmail.trim().lowercase()
-    val pass = password.trim()
-
-    if (identifier.isBlank()) {
-      _adminLoginFeedback.value = AdminLoginFeedback.Error("Please enter your admin username or email.")
-      return
-    }
-    if (pass.length < 4) {
-      _adminLoginFeedback.value = AdminLoginFeedback.Error("Please enter your admin password (at least 4 characters).")
-      return
-    }
-
-    val validAdminIdentifiers =
-      buildSet {
-        add(ADMIN_USERNAME)
-        add(BookingRepository.BOOTSTRAPPED_ADMIN_HALL)
-        add(BookingRepository.BOOTSTRAPPED_ADMIN_PRIMARY)
-        currentUserEmail?.lowercase()?.let { add(it) }
-      }
-
-    if (identifier !in validAdminIdentifiers) {
-      _adminLoginFeedback.value =
-        AdminLoginFeedback.Error("Unrecognized admin username or email.")
-      return
-    }
-
     viewModelScope.launch {
-      val authorized = repository.checkIsAdminAccount()
-      _isAuthorizedAdmin.value = authorized
-      if (!authorized) {
-        _adminLoginFeedback.value =
-          AdminLoginFeedback.Error(
-            message =
-              "Signed-in Google account (${currentUserEmail ?: "unknown"}) does not have admin write permissions. Sign in with the authorized admin Google account to manage bookings.",
-            requiresAdminGoogleAccount = true,
-          )
-        return@launch
+      _adminLoginFeedback.value = AdminLoginFeedback.Idle
+      try {
+        repository.signInAdmin(usernameOrEmail, password)
+        val authorized = repository.checkIsAdminAccount()
+        _isAuthorizedAdmin.value = authorized
+        if (!authorized) throw IllegalStateException("This account is not authorised for admin access.")
+        _isAdminModeUnlocked.value = true
+        _adminLoginFeedback.value = AdminLoginFeedback.Success
+      } catch (e: CancellationException) {
+        throw e
+      } catch (e: Exception) {
+        repository.signOut()
+        _isAuthorizedAdmin.value = false
+        _isAdminModeUnlocked.value = false
+        _adminLoginFeedback.value = AdminLoginFeedback.Error(e.localizedMessage ?: "Login failed. Check username and password.")
       }
-
-      _isAdminModeUnlocked.value = true
-      _adminLoginFeedback.value = AdminLoginFeedback.Success
     }
   }
 
   fun lockAdminMode() {
+    repository.signOut()
     _isAdminModeUnlocked.value = false
+    _isAuthorizedAdmin.value = false
     _adminLoginFeedback.value = AdminLoginFeedback.Idle
   }
 
-  fun saveBooking(
-    dateKey: String,
-    status: BookingStatus,
-    clientName: String,
-    clientPhone: String,
-    eventType: String,
-    notes: String,
-  ) {
+  fun saveBooking(dateKey: String, status: BookingStatus, clientName: String, clientPhone: String, eventType: String, notes: String) {
     if (_isSavingBooking.value) return
     viewModelScope.launch {
       _isSavingBooking.value = true
       try {
-        repository.saveBooking(
-          dateKey = dateKey,
-          status = status,
-          clientName = clientName,
-          clientPhone = clientPhone,
-          eventType = eventType,
-          notes = notes,
-        )
+        repository.saveBooking(dateKey, status, clientName, clientPhone, eventType, notes)
+        refreshTrigger.value += 1
         _actionMessage.value = "Updated $dateKey to ${status.label}"
         _selectedDate.value = null
-      } catch (e: CancellationException) {
-        throw e
-      } catch (e: Exception) {
-        _actionMessage.value = e.localizedMessage ?: "Failed to save booking"
-      } finally {
-        _isSavingBooking.value = false
-      }
+      } catch (e: CancellationException) { throw e }
+      catch (e: Exception) { _actionMessage.value = e.localizedMessage ?: "Failed to save booking" }
+      finally { _isSavingBooking.value = false }
     }
   }
 
@@ -227,21 +146,17 @@ class BookingCalendarViewModel(
       _isSavingBooking.value = true
       try {
         repository.clearBooking(dateKey)
+        refreshTrigger.value += 1
         _actionMessage.value = "$dateKey marked Available"
         _selectedDate.value = null
-      } catch (e: CancellationException) {
-        throw e
-      } catch (e: Exception) {
-        _actionMessage.value = e.localizedMessage ?: "Failed to clear booking"
-      } finally {
-        _isSavingBooking.value = false
-      }
+      } catch (e: CancellationException) { throw e }
+      catch (e: Exception) { _actionMessage.value = e.localizedMessage ?: "Failed to clear booking" }
+      finally { _isSavingBooking.value = false }
     }
   }
 
   private companion object {
     const val TAG = "BookingCalendarVM"
     const val STOP_TIMEOUT_MILLIS = 5000L
-    const val ADMIN_USERNAME = "admin980123"
   }
 }
