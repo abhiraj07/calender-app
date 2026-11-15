@@ -21,7 +21,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
@@ -29,11 +28,6 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.example.data.BookingRepository
-import com.example.ui.BookingCalendarViewModel
-import com.example.ui.screens.AdminLoginScreen
-import com.example.ui.screens.BookingCalendarScreen
-import com.example.ui.theme.MyApplicationTheme
 import com.example.data.BookingRepository
 import com.example.ui.BookingCalendarViewModel
 import com.example.ui.screens.AdminLoginScreen
@@ -69,10 +63,6 @@ private fun AuthenticatedHallApp() {
       factory =
         viewModelFactory {
           initializer {
-            val app =
-              checkNotNull(this[APPLICATION_KEY]) {
-                "APPLICATION_KEY missing from CreationExtras"
-              }
             BookingCalendarViewModel(
               repository = BookingRepository(),
               currentUserId = "",
