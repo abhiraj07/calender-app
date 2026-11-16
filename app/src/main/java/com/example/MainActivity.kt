@@ -1,6 +1,8 @@
 package com.example
 
 import android.os.Bundle
+import android.os.SystemClock
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -54,7 +56,11 @@ fun AppNavigation() {
     composable(ROUTE_ADMIN_LOGIN) {
       AdminLoginScreen(
         viewModel = viewModel,
-        onLoginSuccess = { navController.popBackStack() },
+        onLoginSuccess = {
+          val navigationStartedAt = SystemClock.elapsedRealtime()
+          navController.popBackStack()
+          Log.d("LoginTiming", "calendar_navigation_pop_call durationMs=${SystemClock.elapsedRealtime() - navigationStartedAt}")
+        },
         onBackToCalendar = { navController.popBackStack() },
         onSwitchGoogleAccount = {},
       )
