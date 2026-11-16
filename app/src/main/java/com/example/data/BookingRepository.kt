@@ -43,7 +43,7 @@ class BookingRepository(context: Context) {
 
     accessToken = token
     signedInUserId = userId
-    if (refreshToken.isNotBlank()) sessionStore.saveRefreshToken(refreshToken)
+    if (refreshToken.isNotBlank()) withContext(Dispatchers.IO) { sessionStore.saveRefreshToken(refreshToken) }
     val allowed = request(
       path = "/rest/v1/admin_users?select=user_id&user_id=eq.${enc(userId)}&limit=1",
       method = "GET",
@@ -63,7 +63,7 @@ class BookingRepository(context: Context) {
   }
 
   suspend fun restoreAdminSession(): Boolean {
-    val refreshToken = sessionStore.readRefreshToken() ?: return false
+    val refreshToken = withContext(Dispatchers.IO) { sessionStore.readRefreshToken() } ?: return false
     return try {
       val auth = request(
         path = "/auth/v1/token?grant_type=refresh_token",
@@ -77,7 +77,7 @@ class BookingRepository(context: Context) {
       if (token.isBlank() || userId.isBlank()) throw IllegalStateException("Invalid refreshed session.")
       accessToken = token
       signedInUserId = userId
-      if (nextRefreshToken.isNotBlank()) sessionStore.saveRefreshToken(nextRefreshToken)
+      if (nextRefreshToken.isNotBlank()) withContext(Dispatchers.IO) { sessionStore.saveRefreshToken(nextRefreshToken) }
       if (!checkIsAdminAccount()) throw IllegalStateException("Admin authorization is no longer valid.")
       true
     } catch (_: Exception) {
