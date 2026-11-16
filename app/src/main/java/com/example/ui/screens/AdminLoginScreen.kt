@@ -74,13 +74,11 @@ fun AdminLoginScreen(
   viewModel: BookingCalendarViewModel,
   onLoginSuccess: () -> Unit,
   onBackToCalendar: () -> Unit,
-  onLogout: () -> Unit,
   onSwitchGoogleAccount: () -> Unit,
 ) {
   BackHandler { onBackToCalendar() }
 
   val feedback by viewModel.adminLoginFeedback.collectAsStateWithLifecycle()
-  val isAdminUnlocked by viewModel.isAdminModeUnlocked.collectAsStateWithLifecycle()
 
   var usernameOrEmail by rememberSaveable { mutableStateOf("") }
   var password by rememberSaveable { mutableStateOf("") }
@@ -141,20 +139,6 @@ fun AdminLoginScreen(
               style = MaterialTheme.typography.bodyMedium,
               color = MutedSageText,
             )
-            if (isAdminUnlocked) {
-              Text(
-                text = "Admin session is active on this device.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = EmeraldDeep,
-                fontWeight = FontWeight.SemiBold,
-              )
-              OutlinedButton(
-                onClick = onLogout,
-                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("admin_logout_button"),
-              ) {
-                Text("Logout", fontWeight = FontWeight.Bold)
-              }
-            }
           }
 
           val textFieldColors =
