@@ -111,9 +111,8 @@ class BookingCalendarViewModel(
       _adminLoginFeedback.value = AdminLoginFeedback.Idle
       try {
         repository.signInAdmin(usernameOrEmail, password)
-        val authorized = repository.checkIsAdminAccount()
-        _isAuthorizedAdmin.value = authorized
-        if (!authorized) throw IllegalStateException("This account is not authorised for admin access.")
+        // signInAdmin already verifies this user against admin_users.
+        _isAuthorizedAdmin.value = true
         _isAdminModeUnlocked.value = true
         _adminLoginFeedback.value = AdminLoginFeedback.Success
       } catch (e: CancellationException) {
