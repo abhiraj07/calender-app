@@ -27,6 +27,9 @@ import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -97,6 +100,8 @@ fun BookingDetailSheet(
   var eventType by remember(date.dateKey, adminBooking) {
     mutableStateOf(adminBooking?.eventType.orEmpty())
   }
+  var eventTypeExpanded by remember { mutableStateOf(false) }
+  val eventTypeOptions = listOf("Marriage", "Engagement", "Anniversary", "Meeting", "Birthday Party", "Others")
   var notes by remember(date.dateKey, adminBooking) {
     mutableStateOf(adminBooking?.notes.orEmpty())
   }
@@ -226,15 +231,37 @@ fun BookingDetailSheet(
           modifier = Modifier.fillMaxWidth().testTag("booking_client_phone_input"),
         )
 
-        OutlinedTextField(
-          value = eventType,
-          onValueChange = { eventType = it },
-          label = { Text(stringResource(R.string.event_type_label)) },
-          singleLine = true,
-          colors = fieldColors,
-          shape = RoundedCornerShape(12.dp),
-          modifier = Modifier.fillMaxWidth().testTag("booking_event_type_input"),
-        )
+        ExposedDropdownMenuBox(
+          expanded = eventTypeExpanded,
+          onExpandedChange = { eventTypeExpanded = !eventTypeExpanded },
+          modifier = Modifier.fillMaxWidth(),
+        ) {
+          OutlinedTextField(
+            value = eventType,
+            onValueChange = {},
+            readOnly = true,
+            label = { Text(stringResource(R.string.event_type_label)) },
+            placeholder = { Text("Select event type") },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = eventTypeExpanded) },
+            colors = fieldColors,
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier.menuAnchor().fillMaxWidth().testTag("booking_event_type_input"),
+          )
+          ExposedDropdownMenu(
+            expanded = eventTypeExpanded,
+            onDismissRequest = { eventTypeExpanded = false },
+          ) {
+            eventTypeOptions.forEach { option ->
+              DropdownMenuItem(
+                text = { Text(option) },
+                onClick = {
+                  eventType = option
+                  eventTypeExpanded = false
+                },
+              )
+            }
+          }
+        }
 
         OutlinedTextField(
           value = notes,
