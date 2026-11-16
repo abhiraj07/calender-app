@@ -1,6 +1,8 @@
 package com.example.data
 
 import android.content.Context
+import android.os.SystemClock
+import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -18,10 +20,12 @@ import java.net.URLEncoder
  */
 class BookingRepository(context: Context) {
   private val sessionStore = SecureSessionStore(context)
+  private val loginTimingTag = "LoginTiming"
   @Volatile private var accessToken: String? = null
   @Volatile private var signedInUserId: String? = null
 
   suspend fun signInAdmin(usernameOrEmail: String, password: String): Boolean {
+    val loginStartedAt = SystemClock.elapsedRealtime()
     val identifier = usernameOrEmail.trim().lowercase()
     val email = when (identifier) {
       ADMIN_USERNAME -> ADMIN_EMAIL
@@ -43,16 +47,22 @@ class BookingRepository(context: Context) {
 
     accessToken = token
     signedInUserId = userId
-    if (refreshToken.isNotBlank()) withContext(Dispatchers.IO) { sessionStore.saveRefreshToken(refreshToken) }
+    if (refreshToken.isNotBlank()) {
+      val saveStartedAt = SystemClock.elapsedRealtime()
+      withContext(Dispatchers.IO) { sessionStore.saveRefreshToken(refreshToken) }
+      Log.d(loginTimingTag, "session_save durationMs=${SystemClock.elapsedRealtime() - saveStartedAt}")
+    }
     val allowed = request(
       path = "/rest/v1/admin_users?select=user_id&user_id=eq.${enc(userId)}&limit=1",
       method = "GET",
       token = token,
     )
+    Log.d(loginTimingTag, "login_total_until_admin_check durationMs=${SystemClock.elapsedRealtime() - loginStartedAt}")
     if (allowed.optJSONArrayOrEmpty().length() == 0) {
       signOut()
       throw IllegalStateException("This account is not authorised for Shree Banquet Hall admin access.")
     }
+    Log.d(loginTimingTag, "login_complete durationMs=${SystemClock.elapsedRealtime() - loginStartedAt}")
     return true
   }
 
@@ -186,6 +196,18 @@ class BookingRepository(context: Context) {
     body: JSONObject? = null,
     token: String? = accessToken,
   ): JSONObject = withContext(Dispatchers.IO) {
+    val requestStartedAt = SystemClock.elapsedRealtime()
+    var responseCode = -1
+    val safeEndpoint = when {
+      path.startsWith("/auth/v1/token?grant_type=password") -> "auth_password"
+      path.startsWith("/auth/v1/token?grant_type=refresh_token") -> "auth_refresh"
+      path.startsWith("/rest/v1/admin_users") -> "admin_authorization"
+      path.startsWith("/rest/v1/public_booking_calendar") -> "public_calendar"
+      path.startsWith("/rest/v1/admin_bookings") -> "admin_bookings"
+      path.startsWith("/rest/v1/rpc/save_shree_booking") -> "save_booking"
+      path.startsWith("/rest/v1/rpc/clear_shree_booking") -> "clear_booking"
+      else -> "other"
+    }
     val connection = (URL(SUPABASE_URL + path).openConnection() as HttpURLConnection).apply {
       requestMethod = method
       connectTimeout = 15000
@@ -201,6 +223,7 @@ class BookingRepository(context: Context) {
     try {
       if (body != null) connection.outputStream.use { it.write(body.toString().toByteArray(Charsets.UTF_8)) }
       val code = connection.responseCode
+      responseCode = code
       val stream = if (code in 200..299) connection.inputStream else connection.errorStream
       val response = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
       if (code !in 200..299) {
@@ -209,6 +232,7 @@ class BookingRepository(context: Context) {
       }
       if (response.isBlank()) JSONObject() else if (response.trimStart().startsWith("[")) JSONObject().put("data", JSONArray(response)) else JSONObject(response)
     } finally {
+      Log.d(loginTimingTag, "request=$safeEndpoint method=$method status=$responseCode durationMs=${SystemClock.elapsedRealtime() - requestStartedAt}")
       connection.disconnect()
     }
   }
