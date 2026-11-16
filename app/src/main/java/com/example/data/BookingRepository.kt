@@ -1,5 +1,6 @@
 package com.example.data
 
+import android.content.Context
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -15,7 +16,8 @@ import java.net.URLEncoder
  * Single source of truth for the Android app: the same Supabase project used by
  * the public website and private calendar. No Firebase/Firestore data path.
  */
-class BookingRepository {
+class BookingRepository(context: Context) {
+  private val sessionStore = SecureSessionStore(context)
   @Volatile private var accessToken: String? = null
   @Volatile private var signedInUserId: String? = null
 
@@ -35,11 +37,13 @@ class BookingRepository {
       token = null,
     )
     val token = auth.optString("access_token")
+    val refreshToken = auth.optString("refresh_token")
     val userId = auth.optJSONObject("user")?.optString("id").orEmpty()
     if (token.isBlank() || userId.isBlank()) throw IllegalStateException("Supabase did not return a valid admin session.")
 
     accessToken = token
     signedInUserId = userId
+    if (refreshToken.isNotBlank()) sessionStore.saveRefreshToken(refreshToken)
     val allowed = request(
       path = "/rest/v1/admin_users?select=user_id&user_id=eq.${enc(userId)}&limit=1",
       method = "GET",
@@ -55,6 +59,31 @@ class BookingRepository {
   fun signOut() {
     accessToken = null
     signedInUserId = null
+    sessionStore.clear()
+  }
+
+  suspend fun restoreAdminSession(): Boolean {
+    val refreshToken = sessionStore.readRefreshToken() ?: return false
+    return try {
+      val auth = request(
+        path = "/auth/v1/token?grant_type=refresh_token",
+        method = "POST",
+        body = JSONObject().put("refresh_token", refreshToken),
+        token = null,
+      )
+      val token = auth.optString("access_token")
+      val nextRefreshToken = auth.optString("refresh_token")
+      val userId = auth.optJSONObject("user")?.optString("id").orEmpty()
+      if (token.isBlank() || userId.isBlank()) throw IllegalStateException("Invalid refreshed session.")
+      accessToken = token
+      signedInUserId = userId
+      if (nextRefreshToken.isNotBlank()) sessionStore.saveRefreshToken(nextRefreshToken)
+      if (!checkIsAdminAccount()) throw IllegalStateException("Admin authorization is no longer valid.")
+      true
+    } catch (_: Exception) {
+      signOut()
+      false
+    }
   }
 
   suspend fun checkIsAdminAccount(): Boolean {
