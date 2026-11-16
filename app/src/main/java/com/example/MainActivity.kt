@@ -56,6 +56,10 @@ fun AppNavigation() {
         viewModel = viewModel,
         onLoginSuccess = { navController.popBackStack() },
         onBackToCalendar = { navController.popBackStack() },
+        onLogout = {
+          viewModel.lockAdminMode()
+          navController.popBackStack()
+        },
         onSwitchGoogleAccount = {},
       )
     }
