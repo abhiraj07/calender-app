@@ -1,6 +1,7 @@
 package com.example.ui
 
 import android.util.Log
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.AdminBookingEntry
@@ -40,6 +41,14 @@ sealed interface AdminLoginFeedback {
 class BookingCalendarViewModel(
   private val repository: BookingRepository,
 ) : ViewModel() {
+  init {
+    viewModelScope.launch {
+      if (repository.restoreAdminSession()) {
+        _isAuthorizedAdmin.value = true
+        _isAdminModeUnlocked.value = true
+      }
+    }
+  }
   private val _displayedMonth = MutableStateFlow(HallYearMonth.current())
   private val refreshTrigger = MutableStateFlow(0)
   private val _isRefreshing = MutableStateFlow(false)
