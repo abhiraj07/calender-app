@@ -1,5 +1,7 @@
 package com.example.ui.screens
 
+import android.os.SystemClock
+import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -83,11 +85,15 @@ fun AdminLoginScreen(
   var usernameOrEmail by rememberSaveable { mutableStateOf("") }
   var password by rememberSaveable { mutableStateOf("") }
   var passwordVisible by rememberSaveable { mutableStateOf(false) }
+  var loginSuccessObservedAt by remember { mutableStateOf(0L) }
 
   LaunchedEffect(feedback) {
     if (feedback is AdminLoginFeedback.Success) {
+      loginSuccessObservedAt = SystemClock.elapsedRealtime()
+      Log.d("LoginTiming", "login_screen_success_observed")
       viewModel.resetAdminLoginFeedback()
       onLoginSuccess()
+      Log.d("LoginTiming", "navigation_pop_requested afterSuccessMs=${SystemClock.elapsedRealtime() - loginSuccessObservedAt}")
     }
   }
 
