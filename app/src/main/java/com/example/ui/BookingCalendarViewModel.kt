@@ -1,6 +1,7 @@
 package com.example.ui
 
 import android.util.Log
+import android.os.SystemClock
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -108,6 +109,8 @@ class BookingCalendarViewModel(
 
   fun attemptAdminLogin(usernameOrEmail: String, password: String) {
     viewModelScope.launch {
+      val loginStartedAt = SystemClock.elapsedRealtime()
+      Log.d(TAG, "login_attempt_started")
       _adminLoginFeedback.value = AdminLoginFeedback.Idle
       try {
         repository.signInAdmin(usernameOrEmail, password)
@@ -115,6 +118,7 @@ class BookingCalendarViewModel(
         _isAuthorizedAdmin.value = true
         _isAdminModeUnlocked.value = true
         _adminLoginFeedback.value = AdminLoginFeedback.Success
+        Log.d(TAG, "login_viewmodel_success durationMs=${SystemClock.elapsedRealtime() - loginStartedAt}")
       } catch (e: CancellationException) {
         throw e
       } catch (e: Exception) {
@@ -122,6 +126,7 @@ class BookingCalendarViewModel(
         _isAuthorizedAdmin.value = false
         _isAdminModeUnlocked.value = false
         _adminLoginFeedback.value = AdminLoginFeedback.Error(e.localizedMessage ?: "Login failed. Check username and password.")
+        Log.d(TAG, "login_viewmodel_failed durationMs=${SystemClock.elapsedRealtime() - loginStartedAt} errorType=${e.javaClass.simpleName}")
       }
     }
   }
