@@ -6,6 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
@@ -31,7 +32,8 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun AppNavigation() {
-  val repository = remember { BookingRepository() }
+  val context = LocalContext.current
+  val repository = remember(context) { BookingRepository(context.applicationContext) }
   val viewModel: BookingCalendarViewModel = viewModel(
     factory = viewModelFactory {
       initializer { BookingCalendarViewModel(repository) }
